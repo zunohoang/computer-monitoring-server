@@ -1,0 +1,6 @@
+@ComputerMonitoringServerAPI_HostAddress = http://localhost:5045
+
+GET {{ComputerMonitoringServerAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

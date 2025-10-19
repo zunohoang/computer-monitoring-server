@@ -1,0 +1,156 @@
+### Auth and Profile API Tests with JWT
+
+## 1. Register New User
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "email": "john@example.com",
+  "password": "SecurePass123",
+  "fullName": "John Doe"
+}
+
+### Response: 201 Created with token
+
+---
+
+## 2. Register with Duplicate Username
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "email": "another@example.com",
+  "password": "SecurePass123",
+  "fullName": "Another User"
+}
+
+### Response: 400 Bad Request - "Username đã tồn tại"
+
+---
+
+## 3. Login (Get JWT Token)
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "password": "SecurePass123"
+}
+
+### Response: 200 OK with JWT token
+# Copy the token from response for authenticated requests
+
+---
+
+## 4. Login with Wrong Password
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "password": "WrongPassword"
+}
+
+### Response: 401 Unauthorized
+
+---
+
+## 5. Refresh Token
+POST http://localhost:5000/api/auth/refresh-token
+Content-Type: application/json
+
+{
+  "refreshToken": "use_the_token_from_login_response"
+}
+
+### Response: 200 OK with new access token
+
+---
+
+## 6. Get User by ID (No Auth Required)
+GET http://localhost:5000/api/auth/1
+
+### Response: 200 OK
+
+---
+
+## 7. Get User by Username (No Auth Required)
+GET http://localhost:5000/api/auth/username/john_doe
+
+### Response: 200 OK
+
+---
+
+## 8. Get Profile (Requires Auth)
+GET http://localhost:5000/api/profile/1
+Authorization: Bearer {JWT_TOKEN_HERE}
+
+### Response: 200 OK
+
+---
+
+## 9. Update Profile (Requires Auth)
+PUT http://localhost:5000/api/profile/1
+Authorization: Bearer {JWT_TOKEN_HERE}
+Content-Type: application/json
+
+{
+  "fullName": "John Updated",
+  "email": "john.updated@example.com"
+}
+
+### Response: 200 OK - "Cập nhật profile thành công"
+
+---
+
+## 10. Change Password (Requires Auth)
+POST http://localhost:5000/api/profile/1/change-password
+Authorization: Bearer {JWT_TOKEN_HERE}
+Content-Type: application/json
+
+{
+  "currentPassword": "SecurePass123",
+  "newPassword": "NewPass456",
+  "confirmPassword": "NewPass456"
+}
+
+### Response: 200 OK - "Đổi mật khẩu thành công"
+
+---
+
+## 11. Change Password with Wrong Current Password
+POST http://localhost:5000/api/profile/1/change-password
+Authorization: Bearer {JWT_TOKEN_HERE}
+Content-Type: application/json
+
+{
+  "currentPassword": "WrongPassword",
+  "newPassword": "NewPass456",
+  "confirmPassword": "NewPass456"
+}
+
+### Response: 400 Bad Request - "Mật khẩu hiện tại không chính xác"
+
+---
+
+## 12. Update Profile with Duplicate Email
+PUT http://localhost:5000/api/profile/1
+Authorization: Bearer {JWT_TOKEN_HERE}
+Content-Type: application/json
+
+{
+  "fullName": "John",
+  "email": "existing@example.com"
+}
+
+### Response: 400 Bad Request - "Email này đã được sử dụng"
+
+---
+
+## 13. Access Protected Endpoint Without Token
+GET http://localhost:5000/api/profile/1
+
+### Response: 401 Unauthorized - "Authorization header is missing"
+
