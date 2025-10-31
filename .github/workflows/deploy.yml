@@ -98,13 +98,19 @@ jobs:
           script_stop: true
           debug: true
           script: |
-            set -e  # Exit on error
-            set -x  # Print commands
+            set -x  # Print commands (for debugging)
 
             # Kiểm tra Docker và Docker Compose
             echo "Checking Docker installation..."
-            docker --version || { echo "❌ Docker not found"; exit 1; }
-            docker compose version || { echo "❌ Docker Compose not found"; exit 1; }
+            if ! docker --version; then
+              echo "❌ Docker not found"
+              exit 1
+            fi
+
+            if ! docker compose version; then
+              echo "❌ Docker Compose not found"
+              exit 1
+            fi
 
             # Tạo thư mục cho project nếu chưa có
             mkdir -p ~/computer-monitoring-api
@@ -112,8 +118,17 @@ jobs:
 
             # Pull code mới nhất (để lấy docker-compose.yml)
             if [ -d ".git" ]; then
-              git pull origin main
+              echo "Git repository exists, pulling latest changes..."
+              git pull origin main || {
+                echo "⚠️ Git pull failed, trying to re-clone..."
+                cd ..
+                rm -rf computer-monitoring-api
+                mkdir -p computer-monitoring-api
+                cd computer-monitoring-api
+                git clone https://github.com/${{ github.repository }}.git .
+              }
             else
+              echo "Git repository not found, cloning..."
               git clone https://github.com/${{ github.repository }}.git .
             fi
 
@@ -151,10 +166,11 @@ jobs:
               echo "❌ Failed to pull Docker image"
               exit 1
             fi
+            echo "✅ Docker image pulled successfully"
 
             # Dừng và xóa container cũ (nếu có)
             echo "Stopping old containers..."
-            docker compose down || true
+            docker compose down 2>/dev/null || echo "No containers to stop"
 
             # Khởi động lại với image mới
             echo "Starting new containers..."
@@ -164,10 +180,15 @@ jobs:
               docker compose logs --tail=100
               exit 1
             fi
+            echo "✅ Containers started successfully"
+
+            # Đợi một chút để container khởi động
+            echo "Waiting for containers to initialize..."
+            sleep 5
 
             # Xóa các image cũ không dùng nữa (giải phóng dung lượng)
             echo "Cleaning up old images..."
-            docker image prune -af --filter "until=24h" || true
+            docker image prune -af --filter "until=24h" 2>/dev/null || echo "No old images to clean"
 
             # Kiểm tra trạng thái
             echo "Checking container status..."
@@ -178,7 +199,9 @@ jobs:
             docker compose logs --tail=50
 
             # Kiểm tra xem container có chạy không
-            if ! docker compose ps | grep -q "Up"; then
+            if docker compose ps | grep -q "Up"; then
+              echo "✅ Containers are running successfully"
+            else
               echo "⚠️ Warning: No containers are running"
               echo "Full logs:"
               docker compose logs
