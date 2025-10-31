@@ -96,7 +96,16 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT || 22 }}
           script_stop: true
+          debug: true
           script: |
+            set -e  # Exit on error
+            set -x  # Print commands
+
+            # Kiểm tra Docker và Docker Compose
+            echo "Checking Docker installation..."
+            docker --version || { echo "❌ Docker not found"; exit 1; }
+            docker compose version || { echo "❌ Docker Compose not found"; exit 1; }
+
             # Tạo thư mục cho project nếu chưa có
             mkdir -p ~/computer-monitoring-api
             cd ~/computer-monitoring-api
@@ -111,7 +120,7 @@ jobs:
             # Tạo file .env nếu chưa có
             if [ ! -f ".env" ]; then
               echo "Creating .env file..."
-              cat > .env << EOF
+              cat > .env << 'EOF'
             DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             IMAGE_TAG=latest
             POSTGRES_DB=ComputerMonitoring
@@ -123,11 +132,25 @@ jobs:
             JWT_AUDIENCE=ComputerMonitoringClients
             JWT_EXPIRY_MINUTES=60
             EOF
+              echo "✅ .env file created"
+              echo "Verifying .env file..."
+              if [ -f ".env" ]; then
+                echo "✅ .env file exists"
+                echo "File size: $(wc -c < .env) bytes"
+              else
+                echo "❌ Failed to create .env file"
+                exit 1
+              fi
+            else
+              echo "✅ .env file already exists"
             fi
 
             # Pull Docker image mới nhất
             echo "Pulling latest Docker image..."
-            docker pull ${{ env.DOCKER_IMAGE }}:latest
+            if ! docker pull ${{ env.DOCKER_IMAGE }}:latest; then
+              echo "❌ Failed to pull Docker image"
+              exit 1
+            fi
 
             # Dừng và xóa container cũ (nếu có)
             echo "Stopping old containers..."
@@ -135,7 +158,12 @@ jobs:
 
             # Khởi động lại với image mới
             echo "Starting new containers..."
-            docker compose up -d
+            if ! docker compose up -d; then
+              echo "❌ Failed to start containers"
+              echo "Showing logs for debugging:"
+              docker compose logs --tail=100
+              exit 1
+            fi
 
             # Xóa các image cũ không dùng nữa (giải phóng dung lượng)
             echo "Cleaning up old images..."
@@ -148,6 +176,14 @@ jobs:
             # Hiển thị logs gần nhất
             echo "Recent logs:"
             docker compose logs --tail=50
+
+            # Kiểm tra xem container có chạy không
+            if ! docker compose ps | grep -q "Up"; then
+              echo "⚠️ Warning: No containers are running"
+              echo "Full logs:"
+              docker compose logs
+              exit 1
+            fi
 
       - name: ✅ Verify deployment
         uses: appleboy/ssh-action@v1.0.3
