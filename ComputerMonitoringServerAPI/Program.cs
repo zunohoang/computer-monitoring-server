@@ -4,6 +4,7 @@ using ComputerMonitoringServerAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Net.WebSockets;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -78,7 +79,31 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ws service
+// Configure the HTTP request pipeline.
+// Enable Swagger in all environments for debugging
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Computer Monitoring API V1");
+    c.RoutePrefix = "swagger";
+});
+
+// CORS must be before Authentication/Authorization
+app.UseCors("AllowAll");
+
+// app.UseHttpsRedirection(); // Disabled for HTTP-only deployment
+
+// Authentication & Authorization
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Map Health Checks
+app.MapHealthChecks("/health");
+
+// Map Controllers - MUST be before WebSocket middleware
+app.MapControllers();
+
+// WebSocket Configuration - at the end to not block other routes
 var webSocketOptions = new WebSocketOptions
 {
     KeepAliveInterval = TimeSpan.FromSeconds(120)
@@ -86,37 +111,25 @@ var webSocketOptions = new WebSocketOptions
 
 app.UseWebSockets(webSocketOptions);
 
-// Route WebSocket
-app.Map("/ws", async context =>
+// WebSocket handler - only handle /ws path, let other requests pass through
+app.Use(async (context, next) =>
 {
-    if (context.WebSockets.IsWebSocketRequest)
+    if (context.Request.Path == "/ws")
     {
-        var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-        await WebSocketHandler.Handle(context, webSocket);
+        if (context.WebSockets.IsWebSocketRequest)
+        {
+            var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+            await WebSocketHandler.Handle(context, webSocket);
+        }
+        else
+        {
+            context.Response.StatusCode = 400;
+        }
     }
     else
     {
-        context.Response.StatusCode = 400;
+        await next(); // Let the request continue to controllers
     }
 });
-
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-// app.UseHttpsRedirection();
-app.UseCors("AllowAll");
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-// Map Health Checks
-app.MapHealthChecks("/health");
-
-app.MapControllers();
 
 app.Run();
