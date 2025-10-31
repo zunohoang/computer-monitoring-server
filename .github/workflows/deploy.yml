@@ -117,7 +117,10 @@ jobs:
             cd ~/computer-monitoring-api
 
             # Pull code mới nhất (để lấy docker-compose.yml)
-            if [ -d ".git" ]; then
+            echo "Checking for existing git repository..."
+            test -d ".git" && GIT_EXISTS=true || GIT_EXISTS=false
+            
+            if [ "$GIT_EXISTS" = "true" ]; then
               echo "Git repository exists, pulling latest changes..."
               git pull origin main || {
                 echo "⚠️ Git pull failed, trying to re-clone..."
