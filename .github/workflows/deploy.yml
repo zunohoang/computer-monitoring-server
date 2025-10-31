@@ -95,50 +95,99 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          script_stop: true
-          debug: true
+          script_stop: false
           script: |
-            set -x  # Print commands (for debugging)
+            set -x
 
-            # Kiểm tra Docker và Docker Compose
-            echo "Checking Docker installation..."
-            if ! docker --version; then
-              echo "❌ Docker not found"
-              exit 1
-            fi
+            echo "==================================="
+            echo "🚀 Starting Deployment"
+            echo "==================================="
 
-            if ! docker compose version; then
-              echo "❌ Docker Compose not found"
-              exit 1
-            fi
+            # Check Docker
+            echo "📦 Checking Docker..."
+            docker --version || exit 1
+            docker compose version || exit 1
 
-            # Tạo thư mục cho project nếu chưa có
+            # Create directory
+            echo "📁 Creating directory..."
             mkdir -p ~/computer-monitoring-api
             cd ~/computer-monitoring-api
 
-            # Pull code mới nhất (để lấy docker-compose.yml)
-            echo "Checking for existing git repository..."
-            test -d ".git" && GIT_EXISTS=true || GIT_EXISTS=false
-            
-            if [ "$GIT_EXISTS" = "true" ]; then
-              echo "Git repository exists, pulling latest changes..."
-              git pull origin main || {
-                echo "⚠️ Git pull failed, trying to re-clone..."
-                cd ..
-                rm -rf computer-monitoring-api
-                mkdir -p computer-monitoring-api
-                cd computer-monitoring-api
-                git clone https://github.com/${{ github.repository }}.git .
-              }
-            else
-              echo "Git repository not found, cloning..."
-              git clone https://github.com/${{ github.repository }}.git .
-            fi
+            # Create docker-compose.yml (KHÔNG CẦN CLONE CODE)
+            echo "📝 Creating docker-compose.yml..."
+            cat > docker-compose.yml << 'COMPOSE_EOF'
+            version: '3.8'
 
-            # Tạo file .env nếu chưa có
-            if [ ! -f ".env" ]; then
-              echo "Creating .env file..."
-              cat > .env << 'EOF'
+            services:
+              postgres:
+                image: postgres:16-alpine
+                container_name: computer_monitoring_postgres
+                restart: unless-stopped
+                environment:
+                  POSTGRES_DB: ${POSTGRES_DB:-ComputerMonitoring}
+                  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+                  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+                ports:
+                  - "5432:5432"
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                networks:
+                  - app-network
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+
+              api:
+                image: ${DOCKER_USERNAME}/computer-monitoring-api:${IMAGE_TAG:-latest}
+                container_name: computer_monitoring_api
+                restart: unless-stopped
+                depends_on:
+                  postgres:
+                    condition: service_healthy
+                environment:
+                  - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
+                  - ASPNETCORE_URLS=http://+:8080
+                  - ConnectionStrings__DefaultConnection=Host=postgres;Database=${POSTGRES_DB:-ComputerMonitoring};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+                  - Jwt__SecretKey=${JWT_SECRET_KEY}
+                  - Jwt__Issuer=${JWT_ISSUER:-ComputerMonitoringAPI}
+                  - Jwt__Audience=${JWT_AUDIENCE:-ComputerMonitoringClients}
+                  - Jwt__ExpiryMinutes=${JWT_EXPIRY_MINUTES:-60}
+                ports:
+                  - "5000:8080"
+                networks:
+                  - app-network
+                healthcheck:
+                  test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+                  start_period: 40s
+                command: >
+                  sh -c "
+                    echo 'Waiting for database...' &&
+                    sleep 10 &&
+                    echo 'Running migrations...' &&
+                    dotnet ef database update --no-build --verbose &&
+                    echo 'Starting application...' &&
+                    dotnet ComputerMonitoringServerAPI.dll
+                  "
+
+            volumes:
+              postgres_data:
+                driver: local
+
+            networks:
+              app-network:
+                driver: bridge
+            COMPOSE_EOF
+
+            echo "✅ docker-compose.yml created"
+
+            # Create .env file
+            echo "📝 Creating .env file..."
+            cat > .env << 'ENV_EOF'
             DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             IMAGE_TAG=latest
             POSTGRES_DB=ComputerMonitoring
@@ -149,67 +198,74 @@ jobs:
             JWT_ISSUER=ComputerMonitoringAPI
             JWT_AUDIENCE=ComputerMonitoringClients
             JWT_EXPIRY_MINUTES=60
-            EOF
-              echo "✅ .env file created"
-              echo "Verifying .env file..."
-              if [ -f ".env" ]; then
-                echo "✅ .env file exists"
-                echo "File size: $(wc -c < .env) bytes"
-              else
-                echo "❌ Failed to create .env file"
-                exit 1
-              fi
-            else
-              echo "✅ .env file already exists"
-            fi
+            ENV_EOF
 
-            # Pull Docker image mới nhất
-            echo "Pulling latest Docker image..."
-            if ! docker pull ${{ env.DOCKER_IMAGE }}:latest; then
-              echo "❌ Failed to pull Docker image"
-              exit 1
-            fi
-            echo "✅ Docker image pulled successfully"
+            echo "✅ .env file created ($(wc -c < .env) bytes)"
 
-            # Dừng và xóa container cũ (nếu có)
-            echo "Stopping old containers..."
+            # Pull Docker image
+            echo "🐳 Pulling Docker image..."
+            docker pull ${{ env.DOCKER_IMAGE }}:latest || exit 1
+            echo "✅ Image pulled"
+
+            # Stop old containers
+            echo "🛑 Stopping old containers..."
             docker compose down 2>/dev/null || echo "No containers to stop"
 
-            # Khởi động lại với image mới
-            echo "Starting new containers..."
-            if ! docker compose up -d; then
-              echo "❌ Failed to start containers"
-              echo "Showing logs for debugging:"
-              docker compose logs --tail=100
-              exit 1
-            fi
-            echo "✅ Containers started successfully"
+            # Start new containers
+            echo "🚀 Starting containers..."
+            docker compose up -d || exit 1
+            echo "✅ Containers started"
 
-            # Đợi một chút để container khởi động
-            echo "Waiting for containers to initialize..."
-            sleep 5
+            # Wait for initialization
+            echo "⏳ Waiting 10s for initialization..."
+            sleep 10
 
-            # Xóa các image cũ không dùng nữa (giải phóng dung lượng)
-            echo "Cleaning up old images..."
-            docker image prune -af --filter "until=24h" 2>/dev/null || echo "No old images to clean"
+            # Cleanup old images
+            echo "🧹 Cleaning up..."
+            docker image prune -af --filter "until=24h" 2>/dev/null || echo "No images to clean"
 
-            # Kiểm tra trạng thái
-            echo "Checking container status..."
+            # Show status
+            echo ""
+            echo "==================================="
+            echo "📊 Container Status:"
+            echo "==================================="
             docker compose ps
 
-            # Hiển thị logs gần nhất
-            echo "Recent logs:"
-            docker compose logs --tail=50
+            echo ""
+            echo "==================================="
+            echo "📋 Recent Logs:"
+            echo "==================================="
+            docker compose logs --tail=30
 
-            # Kiểm tra xem container có chạy không
-            if docker compose ps | grep -q "Up"; then
-              echo "✅ Containers are running successfully"
+            # Verify
+            echo ""
+            echo "==================================="
+            echo "✅ Deployment Verification:"
+            echo "==================================="
+
+            API_COUNT=$(docker compose ps api 2>/dev/null | grep -c "Up" || echo "0")
+            DB_COUNT=$(docker compose ps postgres 2>/dev/null | grep -c "Up" || echo "0")
+
+            echo "API Status: $API_COUNT"
+            echo "DB Status: $DB_COUNT"
+
+            if [ "$API_COUNT" -gt "0" ]; then
+              echo "✅ API is running"
             else
-              echo "⚠️ Warning: No containers are running"
-              echo "Full logs:"
-              docker compose logs
-              exit 1
+              echo "❌ API is NOT running"
             fi
+
+            if [ "$DB_COUNT" -gt "0" ]; then
+              echo "✅ PostgreSQL is running"
+            else
+              echo "❌ PostgreSQL is NOT running"
+            fi
+
+            echo ""
+            echo "==================================="
+            echo "🎉 Deployment Complete!"
+            echo "API: http://${{ secrets.VPS_IP }}:5000"
+            echo "==================================="
 
       - name: ✅ Verify deployment
         uses: appleboy/ssh-action@v1.0.3
