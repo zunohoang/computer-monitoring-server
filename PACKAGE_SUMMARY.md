@@ -112,14 +112,14 @@ Package CI/CD hoàn chỉnh cho ASP.NET Core Web API với PostgreSQL, Docker, v
 # Build Docker image
 docker build -t computer-monitoring-api .
 
-# Run with docker-compose
-docker-compose up -d
+# Run with docker compose
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop
-docker-compose down
+docker compose down
 ```
 
 ### Deployment
@@ -146,16 +146,16 @@ git push origin main
 ssh user@vps-ip
 
 # Xem containers
-docker-compose ps
+docker compose ps
 
 # Xem logs
-docker-compose logs -f
+docker compose logs -f
 
 # Restart
-docker-compose restart
+docker compose restart
 
 # Update
-git pull && docker-compose pull && docker-compose up -d
+git pull && docker compose pull && docker compose up -d
 ```
 
 ## 🔐 Required Secrets
@@ -303,7 +303,7 @@ Cần config trong GitHub Repository Settings:
 ### Troubleshooting
 
 - Check `DEPLOYMENT.md` → Section "Xử lý sự cố"
-- View logs: `docker-compose logs -f`
+- View logs: `docker compose logs -f`
 - GitHub Actions logs
 - VPS system logs: `journalctl -u docker`
 
@@ -311,7 +311,7 @@ Cần config trong GitHub Repository Settings:
 
 ```bash
 # Local development
-docker-compose up --build
+docker compose up --build
 
 # Deploy to production
 git push origin main
@@ -320,13 +320,13 @@ git push origin main
 git revert HEAD && git push
 
 # Check VPS
-ssh user@vps-ip "cd ~/computer-monitoring-api && docker-compose ps"
+ssh user@vps-ip "cd ~/computer-monitoring-api && docker compose ps"
 
 # View logs remotely
-ssh user@vps-ip "cd ~/computer-monitoring-api && docker-compose logs --tail=100"
+ssh user@vps-ip "cd ~/computer-monitoring-api && docker compose logs --tail=100"
 
 # Backup database
-docker-compose exec postgres pg_dump -U postgres ComputerMonitoring > backup.sql
+docker compose exec postgres pg_dump -U postgres ComputerMonitoring > backup.sql
 ```
 
 ## ✅ Ready to Deploy!

@@ -163,7 +163,7 @@ git push origin main
 Nếu gặp vấn đề:
 
 1. Kiểm tra GitHub Actions logs
-2. SSH vào VPS và xem logs: `docker-compose logs -f`
+2. SSH vào VPS và xem logs: `docker compose logs -f`
 3. Tham khảo phần Troubleshooting trong DEPLOYMENT.md
 4. Xem SSH logs: `sudo tail -f /var/log/auth.log`
 

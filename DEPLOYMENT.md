@@ -260,13 +260,13 @@ git pull origin main
 docker pull your-dockerhub-username/computer-monitoring-api:latest
 
 # Dừng và xóa container cũ
-docker-compose down
+docker compose down
 
 # Khởi động lại với image mới
-docker-compose up -d
+docker compose up -d
 
 # Kiểm tra logs
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ---
@@ -309,19 +309,19 @@ ComputerMonitoringServerAPI/
 
 ```bash
 # Kiểm tra container đang chạy
-docker-compose ps
+docker compose ps
 
 # Xem logs API
-docker-compose logs api -f
+docker compose logs api -f
 
 # Xem logs PostgreSQL
-docker-compose logs postgres -f
+docker compose logs postgres -f
 
 # Kiểm tra health của container
-docker-compose exec api curl http://localhost:8080/health
+docker compose exec api curl http://localhost:8080/health
 
 # Kiểm tra database connection
-docker-compose exec postgres psql -U postgres -d ComputerMonitoring -c "\dt"
+docker compose exec postgres psql -U postgres -d ComputerMonitoring -c "\dt"
 ```
 
 ### Test API
@@ -406,13 +406,13 @@ sudo systemctl restart sshd
 cd ~/computer-monitoring-api
 
 # Kiểm tra logs chi tiết
-docker-compose logs api
+docker compose logs api
 
 # Thử chạy migration thủ công
-docker-compose exec api dotnet ef database update --verbose
+docker compose exec api dotnet ef database update --verbose
 
 # Kiểm tra PostgreSQL
-docker-compose exec postgres psql -U postgres -l
+docker compose exec postgres psql -U postgres -l
 ````
 
 ### Vấn đề 4: Container không start
@@ -433,8 +433,8 @@ sudo kill -9 <PID>
 cat .env
 
 # Restart containers
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 ```
 
 ### Vấn đề 5: Database data bị mất
@@ -448,10 +448,10 @@ docker-compose up -d
 docker volume ls
 
 # Backup database
-docker-compose exec postgres pg_dump -U postgres ComputerMonitoring > backup.sql
+docker compose exec postgres pg_dump -U postgres ComputerMonitoring > backup.sql
 
 # Restore database
-docker-compose exec -T postgres psql -U postgres ComputerMonitoring < backup.sql
+docker compose exec -T postgres psql -U postgres ComputerMonitoring < backup.sql
 ```
 
 ---
@@ -462,16 +462,16 @@ docker-compose exec -T postgres psql -U postgres ComputerMonitoring < backup.sql
 
 ```bash
 # Tất cả services
-docker-compose logs -f
+docker compose logs -f
 
 # Chỉ API
-docker-compose logs -f api
+docker compose logs -f api
 
 # Chỉ PostgreSQL
-docker-compose logs -f postgres
+docker compose logs -f postgres
 
 # 100 dòng log gần nhất
-docker-compose logs --tail=100 api
+docker compose logs --tail=100 api
 ```
 
 ### Kiểm tra resource usage
@@ -506,8 +506,8 @@ nano docker-compose.yml
 # Sửa: image: your-dockerhub-username/computer-monitoring-api:<old-tag>
 
 # Restart
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 ```
 
 ---
@@ -517,7 +517,7 @@ docker-compose up -d
 1. **Luôn test trên môi trường local trước khi push**
 
    ```bash
-   docker-compose -f docker-compose.yml up --build
+   docker compose -f docker-compose.yml up --build
    ```
 
 2. **Sử dụng versioning cho Docker images**
@@ -530,7 +530,7 @@ docker-compose up -d
    ```bash
    # Tạo cron job backup hàng ngày
    crontab -e
-   # Thêm: 0 2 * * * cd ~/computer-monitoring-api && docker-compose exec postgres pg_dump -U postgres ComputerMonitoring > ~/backups/db_$(date +\%Y\%m\%d).sql
+   # Thêm: 0 2 * * * cd ~/computer-monitoring-api && docker compose exec postgres pg_dump -U postgres ComputerMonitoring > ~/backups/db_$(date +\%Y\%m\%d).sql
    ```
 
 4. **Monitor logs và resources**
@@ -549,7 +549,7 @@ docker-compose up -d
 
 Nếu gặp vấn đề, hãy:
 
-1. Kiểm tra logs: `docker-compose logs -f`
+1. Kiểm tra logs: `docker compose logs -f`
 2. Kiểm tra GitHub Actions logs
 3. Tham khảo phần "Xử lý sự cố" ở trên
 

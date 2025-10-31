@@ -131,11 +131,11 @@ jobs:
 
             # Dừng và xóa container cũ (nếu có)
             echo "Stopping old containers..."
-            docker-compose down || true
+            docker compose down || true
 
             # Khởi động lại với image mới
             echo "Starting new containers..."
-            docker-compose up -d
+            docker compose up -d
 
             # Xóa các image cũ không dùng nữa (giải phóng dung lượng)
             echo "Cleaning up old images..."
@@ -143,11 +143,11 @@ jobs:
 
             # Kiểm tra trạng thái
             echo "Checking container status..."
-            docker-compose ps
+            docker compose ps
 
             # Hiển thị logs gần nhất
             echo "Recent logs:"
-            docker-compose logs --tail=50
+            docker compose logs --tail=50
 
       - name: ✅ Verify deployment
         uses: appleboy/ssh-action@v1.0.3
@@ -162,9 +162,9 @@ jobs:
             # Chờ container khởi động (tối đa 60 giây)
             echo "Waiting for containers to be healthy..."
             for i in {1..12}; do
-              if docker-compose ps | grep -q "healthy\|Up"; then
+              if docker compose ps | grep -q "healthy\|Up"; then
                 echo "✅ Containers are running!"
-                docker-compose ps
+                docker compose ps
                 exit 0
               fi
               echo "Waiting... ($i/12)"
@@ -172,8 +172,8 @@ jobs:
             done
 
             echo "⚠️ Warning: Containers might not be fully healthy yet"
-            docker-compose ps
-            docker-compose logs --tail=100
+            docker compose ps
+            docker compose logs --tail=100
 
   # ====================================
   # Job 4: Notification (Optional)

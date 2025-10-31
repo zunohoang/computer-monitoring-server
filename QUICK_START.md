@@ -89,7 +89,7 @@ Xong! 🎉 GitHub Actions sẽ tự động deploy.
 # SSH vào VPS kiểm tra
 ssh user@vps-ip
 cd ~/computer-monitoring-api
-docker-compose ps
+docker compose ps
 
 # Test API
 curl http://vps-ip:5000/health
@@ -124,10 +124,10 @@ ssh user@vps-ip
 
 ```bash
 # Kiểm tra logs
-docker-compose logs api
+docker compose logs api
 
 # Chạy migration thủ công
-docker-compose exec api dotnet ef database update
+docker compose exec api dotnet ef database update
 ```
 
 ## 📚 Tài liệu chi tiết

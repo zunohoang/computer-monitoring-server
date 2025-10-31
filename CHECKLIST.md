@@ -66,7 +66,7 @@ Checklist đầy đủ để thiết lập CI/CD cho dự án Computer Monitorin
 ### Local Testing
 
 - [ ] Build Docker image local: `docker build -t test-api .`
-- [ ] Run docker-compose local: `docker-compose up`
+- [ ] Run docker compose local: `docker compose up`
 - [ ] Kiểm tra API health: `curl http://localhost:5000/health`
 - [ ] Kiểm tra Swagger: `http://localhost:5000/swagger`
 - [ ] Test database connection
@@ -109,10 +109,10 @@ Checklist đầy đủ để thiết lập CI/CD cho dự án Computer Monitorin
 ### After Deployment
 
 - [ ] Verify GitHub Actions status: ✅ Success
-- [ ] Kiểm tra containers trên VPS: `docker-compose ps`
+- [ ] Kiểm tra containers trên VPS: `docker compose ps`
 - [ ] Test API endpoints
 - [ ] Kiểm tra database đã chạy migration
-- [ ] Xem logs: `docker-compose logs -f`
+- [ ] Xem logs: `docker compose logs -f`
 - [ ] Test một số features chính
 
 ## 🔍 Post-deployment Verification
@@ -133,7 +133,7 @@ curl http://vps-ip:5000/api/auth/login -X POST \
 
 ```bash
 # SSH vào VPS
-docker-compose exec postgres psql -U postgres -d ComputerMonitoring
+docker compose exec postgres psql -U postgres -d ComputerMonitoring
 
 # Kiểm tra tables
 \dt
@@ -149,13 +149,13 @@ SELECT * FROM "__EFMigrationsHistory";
 
 ```bash
 # Check status
-docker-compose ps
+docker compose ps
 
 # Check resources
 docker stats
 
 # Check logs
-docker-compose logs --tail=100
+docker compose logs --tail=100
 ```
 
 ## 📊 Monitoring Setup (Post-deployment)
