@@ -1,0 +1,78 @@
+version: "3.8"
+
+services:
+  # ====================================
+  # PostgreSQL Database Service
+  # ====================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ComputerMonitoring}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ====================================
+  # ASP.NET Core API Service
+  # ====================================
+  api:
+    image: ${DOCKER_USERNAME}/computer-monitoring-api:${IMAGE_TAG:-latest}
+    container_name: computer_monitoring_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=${POSTGRES_DB:-ComputerMonitoring};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      - Jwt__SecretKey=${JWT_SECRET_KEY:-your-super-secret-key-here-min-32-chars-production}
+      - Jwt__Issuer=${JWT_ISSUER:-ComputerMonitoringAPI}
+      - Jwt__Audience=${JWT_AUDIENCE:-ComputerMonitoringClients}
+      - Jwt__ExpiryMinutes=${JWT_EXPIRY_MINUTES:-60}
+    ports:
+      - "5000:8080"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Chờ database khởi động xong rồi chạy migration
+    command: >
+      sh -c "
+        echo 'Waiting for database to be ready...' &&
+        sleep 10 &&
+        echo 'Running database migrations...' &&
+        dotnet ef database update --no-build --verbose &&
+        echo 'Starting application...' &&
+        dotnet ComputerMonitoringServerAPI.dll
+      "
+
+# ====================================
+# Volumes
+# ====================================
+volumes:
+  postgres_data:
+    driver: local
+
+# ====================================
+# Networks
+# ====================================
+networks:
+  app-network:
+    driver: bridge

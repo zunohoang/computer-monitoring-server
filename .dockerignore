@@ -1,0 +1,87 @@
+# ====================================
+# .dockerignore
+# Các file/folder không cần thiết khi build Docker image
+# ====================================
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# GitHub
+.github/
+
+# Documentation
+*.md
+docs/
+DEPLOYMENT.md
+QUICK_START.md
+README.MD
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.sln.docstates
+
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+**/TestResults/
+
+# NuGet
+**/.nuget/
+**/packages/
+*.nupkg
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+.env
+.env.*
+
+# Scripts
+scripts/
+
+# Test projects
+**/*Tests/
+**/*.Tests/
+**/tests/
+
+# Node modules (nếu có)
+node_modules/
+npm-debug.log
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+**/tmp/
+**/temp/
+*.tmp
+*.bak
+*.swp
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets (đảm bảo không copy vào image)
+**/appsettings.Production.json
+**/appsettings.*.json
+!**/appsettings.json
+!**/appsettings.Development.json
+**/*secrets*.json
+*.pem
+*.key

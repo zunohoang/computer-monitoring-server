@@ -1,0 +1,19 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=postgres;Database=ComputerMonitoring;Username=postgres;Password=postgres"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.EntityFrameworkCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "Jwt": {
+    "SecretKey": "your-super-secret-key-here-min-32-chars-production-change-this",
+    "Issuer": "ComputerMonitoringAPI",
+    "Audience": "ComputerMonitoringClients",
+    "ExpiryMinutes": 60
+  }
+}

@@ -1,0 +1,198 @@
+name: CI/CD Pipeline - Deploy to VPS
+
+# Trigger workflow khi push lên branch main
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Cho phép chạy manual từ GitHub UI
+
+env:
+  DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/computer-monitoring-api
+  DOCKER_TAG: ${{ github.sha }}
+
+jobs:
+  # ====================================
+  # Job 1: Build và Test
+  # ====================================
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: 📦 Restore dependencies
+        run: dotnet restore ComputerMonitoringServerAPI/ComputerMonitoringServerAPI.csproj
+
+      - name: 🏗️ Build project
+        run: dotnet build ComputerMonitoringServerAPI/ComputerMonitoringServerAPI.csproj --configuration Release --no-restore
+
+      # Optional: Uncomment nếu bạn có unit tests
+      # - name: 🧪 Run tests
+      #   run: dotnet test --no-build --verbosity normal
+
+  # ====================================
+  # Job 2: Build và Push Docker Image
+  # ====================================
+  build-and-push-docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 🏷️ Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          tags: |
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest
+
+      - name: 🐳 Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+            ${{ env.DOCKER_IMAGE }}:latest
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # ====================================
+  # Job 3: Deploy lên VPS
+  # ====================================
+  deploy-to-vps:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build-and-push-docker
+
+    steps:
+      - name: 📥 Checkout code (để lấy docker-compose.yml)
+        uses: actions/checkout@v4
+
+      - name: 🚀 Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            # Tạo thư mục cho project nếu chưa có
+            mkdir -p ~/computer-monitoring-api
+            cd ~/computer-monitoring-api
+
+            # Pull code mới nhất (để lấy docker-compose.yml)
+            if [ -d ".git" ]; then
+              git pull origin main
+            else
+              git clone https://github.com/${{ github.repository }}.git .
+            fi
+
+            # Tạo file .env nếu chưa có
+            if [ ! -f ".env" ]; then
+              echo "Creating .env file..."
+              cat > .env << EOF
+            DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            IMAGE_TAG=latest
+            POSTGRES_DB=ComputerMonitoring
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            ASPNETCORE_ENVIRONMENT=Production
+            JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+            JWT_ISSUER=ComputerMonitoringAPI
+            JWT_AUDIENCE=ComputerMonitoringClients
+            JWT_EXPIRY_MINUTES=60
+            EOF
+            fi
+
+            # Pull Docker image mới nhất
+            echo "Pulling latest Docker image..."
+            docker pull ${{ env.DOCKER_IMAGE }}:latest
+
+            # Dừng và xóa container cũ (nếu có)
+            echo "Stopping old containers..."
+            docker-compose down || true
+
+            # Khởi động lại với image mới
+            echo "Starting new containers..."
+            docker-compose up -d
+
+            # Xóa các image cũ không dùng nữa (giải phóng dung lượng)
+            echo "Cleaning up old images..."
+            docker image prune -af --filter "until=24h" || true
+
+            # Kiểm tra trạng thái
+            echo "Checking container status..."
+            docker-compose ps
+
+            # Hiển thị logs gần nhất
+            echo "Recent logs:"
+            docker-compose logs --tail=50
+
+      - name: ✅ Verify deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            cd ~/computer-monitoring-api
+
+            # Chờ container khởi động (tối đa 60 giây)
+            echo "Waiting for containers to be healthy..."
+            for i in {1..12}; do
+              if docker-compose ps | grep -q "healthy\|Up"; then
+                echo "✅ Containers are running!"
+                docker-compose ps
+                exit 0
+              fi
+              echo "Waiting... ($i/12)"
+              sleep 5
+            done
+
+            echo "⚠️ Warning: Containers might not be fully healthy yet"
+            docker-compose ps
+            docker-compose logs --tail=100
+
+  # ====================================
+  # Job 4: Notification (Optional)
+  # ====================================
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: deploy-to-vps
+    if: always()
+
+    steps:
+      - name: 📢 Notify deployment status
+        run: |
+          if [ "${{ needs.deploy-to-vps.result }}" == "success" ]; then
+            echo "✅ Deployment successful!"
+            echo "🚀 Application deployed to VPS: ${{ secrets.VPS_IP }}"
+            echo "🐳 Docker image: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}"
+          else
+            echo "❌ Deployment failed!"
+            echo "Please check the logs above for more details."
+            exit 1
+          fi

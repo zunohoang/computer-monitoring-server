@@ -6,6 +6,13 @@
 # dotenv files
 .env
 .env.production
+.env.local
+.env.*.local
+
+# Docker override files
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
 
 # User-specific files
 *.rsuser
