@@ -24,7 +24,6 @@
     <Folder Include="Dtos\" />
     <Folder Include="Utils\" />
     <Folder Include="Repositories\" />
-    <Folder Include="Services\" />
   </ItemGroup>
 
 </Project>

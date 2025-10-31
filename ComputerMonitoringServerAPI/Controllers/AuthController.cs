@@ -49,7 +49,7 @@ namespace ComputerMonitoringServerAPI.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            _logger.LogInformation($"Đang xử lý đăng nhập cho username: {request.Username}");
+            _logger.LogInformation($"Đang xử lý đăng nhập cho email: {request.Email}");
 
             var result = await _authService.LoginAsync(request);
 

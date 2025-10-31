@@ -90,7 +90,7 @@ namespace ComputerMonitoringServerAPI.Services
         {
             try
             {
-                var user = await _userRepository.GetByUsernameAsync(request.Username!);
+                var user = await _userRepository.GetByEmailAsync(request.Email!);
                 if (user == null)
                 {
                     return new AuthResponse
