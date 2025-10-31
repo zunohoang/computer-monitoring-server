@@ -132,4 +132,21 @@ app.Use(async (context, next) =>
     }
 });
 
+// Apply any pending EF Core migrations on startup so the DB schema is up-to-date.
+// This helps avoid runtime "relation does not exist" errors in production.
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while migrating the database.");
+        // optionally rethrow or swallow depending on desired behavior. We log and continue so the app can start and return errors.
+    }
+}
+
 app.Run();
